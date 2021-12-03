@@ -258,12 +258,12 @@ public:
         m_totalCosts = rhs.m_totalCosts;
     }
 
-    QString formatCost(int type, quint64 cost) const
+    QString formatCost(int type, qint64 cost) const
     {
         return formatCost(m_units[type], cost);
     }
 
-    static QString formatCost(Unit unit, quint64 cost)
+    static QString formatCost(Unit unit, qint64 cost)
     {
         switch (unit) {
         case Unit::Time:
@@ -388,7 +388,7 @@ struct BottomUpResults
 
     // callback return type is ignored, all frames will be iterated over
     template<typename FrameCallback>
-    const BottomUp* addEvent(int type, quint64 cost, const QVector<qint32>& frames, FrameCallback frameCallback)
+    const BottomUp* addEvent(int type, qint64 cost, const QVector<qint32>& frames, FrameCallback frameCallback)
     {
         costs.addTotalCost(type, cost);
         auto parent = &root;
