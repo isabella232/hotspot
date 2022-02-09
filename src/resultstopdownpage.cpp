@@ -47,6 +47,8 @@ ResultsTopDownPage::ResultsTopDownPage(FilterAndZoomStack* filterStack, PerfPars
                     }
                 }
             });
+
+    connect(parser, &PerfParser::useDiffMode, topDownCostModel, &TopDownModel::setDiffMode);
 }
 
 ResultsTopDownPage::~ResultsTopDownPage() = default;

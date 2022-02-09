@@ -95,6 +95,8 @@ ResultsBottomUpPage::ResultsBottomUpPage(FilterAndZoomStack* filterStack, PerfPa
                 }
             }
         });
+
+    connect(parser, &PerfParser::useDiffMode, bottomUpCostModel, &BottomUpModel::setDiffMode);
 }
 
 ResultsBottomUpPage::~ResultsBottomUpPage() = default;
