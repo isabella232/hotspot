@@ -6,6 +6,8 @@
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
+#include <KConfigGroup>
+#include <KSharedConfig>
 #include <QDir>
 
 #include "settings.h"
@@ -14,6 +16,24 @@ Settings* Settings::instance()
 {
     static Settings settings;
     return &settings;
+}
+
+QVector<Data::TracepointTimeMeasurementsParameters> Settings::tracepointParameters()
+{
+    auto config = KSharedConfig::openConfig()->group("TracepointsTimeMeasurements");
+    QVector<Data::TracepointTimeMeasurementsParameters> parameters;
+
+    for (const auto& groupName : config.groupList()) {
+        auto group = config.group(groupName);
+
+        Data::TracepointTimeMeasurementsParameters parameter;
+        parameter.startRegex = QRegularExpression(group.readEntry("startRegex"));
+        parameter.stopRegex = QRegularExpression(group.readEntry("endRegex"));
+        parameter.name = group.readEntry("costName");
+
+        parameters.push_back(parameter);
+    }
+    return parameters;
 }
 
 void Settings::setPrettifySymbols(bool prettifySymbols)

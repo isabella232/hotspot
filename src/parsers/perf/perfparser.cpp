@@ -812,6 +812,9 @@ public:
     {
         Data::BottomUp::initializeParents(&bottomUpResult.root);
 
+        for (auto it = tracepointCostIdLookup.begin(); it != tracepointCostIdLookup.end(); it++) {
+            bottomUpResult.costs.addTotalCost(it.value(), applicationTime.end - applicationTime.start);
+        }
         summaryResult.applicationTime = applicationTime;
         summaryResult.threadCount = uniqueThreads.size();
         summaryResult.processCount = uniqueProcess.size();
@@ -1009,6 +1012,38 @@ public:
         }
     }
 
+    void addTracepointToTracepointStack(uint32_t tid, const Data::Tracepoint& tracepoint)
+    {
+        const QVector<Data::TracepointTimeMeasurementsParameters> tracepoints =
+            Settings::instance()->tracepointParameters();
+
+        auto addToLookup = [this, &tracepoints](const QString& name) -> bool {
+            for (const auto& parameters : tracepoints) {
+                auto match = parameters.startRegex.match(name);
+                if (match.hasMatch()) {
+                    QString stopName = parameters.stopRegex.pattern();
+                    for (int i = 0; i < match.capturedLength(); i++) {
+                        stopName = stopName.replace(QLatin1Char('\\') + QString::number(i), match.captured(i));
+                    }
+                    tracepointNameRegexCache[name] = stopName;
+
+                    tracepointCostIdLookup[name] = addCostType(parameters.name, Data::Costs::Unit::Time);
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        if (!tracepointNameRegexCache.contains(tracepoint.name)) {
+            if (!addToLookup(tracepoint.name)) {
+                return;
+            }
+        }
+
+        tracepointStack[tid].push_back(tracepoint);
+        exspectedTracepointName[tid].push_back(tracepointNameRegexCache[tracepoint.name]);
+    }
+
     void addSample(const Sample& sample)
     {
         addSampleToFrequencyData(sample);
@@ -1035,11 +1070,50 @@ public:
             const auto attribute = attributes.value(event.type);
             if (attribute.type == static_cast<quint32>(AttributesDefinition::Type::Tracepoint)) {
                 Data::Tracepoint tracepoint;
-                tracepoint.time = event.time;
+                tracepoint.time = sample.time;
                 tracepoint.name = strings.value(attribute.name.id);
+
                 if (tracepoint.name != QLatin1String("sched:sched_switch")) {
                     // sched_switch events are handled separately already
                     tracepointResult.tracepoints.push_back(tracepoint);
+                }
+
+                if (exspectedTracepointName[sample.tid].isEmpty()) {
+                    addTracepointToTracepointStack(sample.tid, tracepoint);
+                } else {
+                    if (tracepoint.name == exspectedTracepointName[sample.tid].last()) {
+                        const auto startTracepoint = tracepointStack[sample.tid].back();
+
+                        bottomUpResult.addTracepointCost(tracepointCostIdLookup[startTracepoint.name], sample.frames,
+                                                         tracepoint.time - startTracepoint.time);
+
+                        tracepointStack[sample.tid].pop_back();
+                        exspectedTracepointName[sample.tid].pop_back();
+                    } else {
+                        // TODO: find solution for this
+                        // This breaks if you have the same tracepoint two times eg
+                        /* c-syscalls 11991 [001]  9905.279844: syscalls:sys_enter_openat: dfd: 0xffffff9c, filename: 0x7fff7cd476a8, flags: 0x00000000, mode: 0x00000000
+                  101f0b __libc_open64+0x5b (inlined)
+                   85ad5 __GI__IO_file_open+0x25 (inlined)
+                   85caa __GI__IO_file_fopen+0x10a (inlined)
+                   79dee __fopen_internal+0x7e (/usr/lib/libc.so.6)
+                    10e7 [unknown] (/home/lieven/KDAB/hotspot/build/tests/test-clients/c-syscalls/c-syscalls)
+                   2d30f __libc_start_call_main+0x7f (/usr/lib/libc.so.6)
+                   2d3c0 __libc_start_main_alias_2+0x80 (inlined)
+                    114d [unknown] (/home/lieven/KDAB/hotspot/build/tests/test-clients/c-syscalls/c-syscalls)
+
+c-syscalls 11991 [001]  9905.280087: syscalls:sys_enter_openat: dfd: 0xffffff9c, filename: 0x7fff7cd476a8, flags: 0x00000000, mode: 0x00000000
+                  101f0b __libc_open64+0x5b (inlined)
+                   85ad5 __GI__IO_file_open+0x25 (inlined)
+                   85caa __GI__IO_file_fopen+0x10a (inlined)
+                   79dee __fopen_internal+0x7e (/usr/lib/libc.so.6)
+                    10e7 [unknown] (/home/lieven/KDAB/hotspot/build/tests/test-clients/c-syscalls/c-syscalls)
+                   2d30f __libc_start_call_main+0x7f (/usr/lib/libc.so.6)
+                   2d3c0 __libc_start_main_alias_2+0x80 (inlined)
+                    114d [unknown] (/home/lieven/KDAB/hotspot/build/tests/test-clients/c-syscalls/c-syscalls)
+                    */
+                        // addTracepointToTracepointStack(sample.tid, tracepoint);
+                    }
                 }
             }
         }
@@ -1308,6 +1382,10 @@ public:
     Data::EventResults eventResult;
     Data::TracepointResults tracepointResult;
     Data::FrequencyResults frequencyResult;
+    QHash<qint32, QVector<Data::Tracepoint>> tracepointStack;
+    QHash<qint32, QVector<QString>> exspectedTracepointName;
+    QHash<QString, qint32> tracepointCostIdLookup;
+    QHash<QString, QString> tracepointNameRegexCache;
     QHash<qint32, QHash<qint32, QString>> commands;
     QScopedPointer<QTextStream> perfScriptOutput;
     QHash<qint32, SymbolCount> numSymbolsByModule;

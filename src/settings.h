@@ -10,6 +10,9 @@
 
 #include <QColor>
 #include <QObject>
+#include <QVector>
+
+#include "models/data.h"
 
 class Settings : public QObject
 {
@@ -118,6 +121,8 @@ public:
     {
         return m_callgraphColor;
     }
+
+    QVector<Data::TracepointTimeMeasurementsParameters> tracepointParameters();
 
 signals:
     void prettifySymbolsChanged(bool);

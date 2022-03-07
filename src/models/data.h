@@ -9,6 +9,7 @@
 
 #include <QHash>
 #include <QMetaType>
+#include <QRegularExpression>
 #include <QSet>
 #include <QString>
 #include <QTypeInfo>
@@ -402,6 +403,8 @@ struct BottomUpResults
             });
         return parent;
     }
+
+    void addTracepointCost(int type, const QVector<qint32>& frames, quint64 cost);
 
 private:
     quint32 maxBottomUpId = 0;
@@ -804,6 +807,13 @@ struct ZoomAction
         return time.isValid();
     }
 };
+
+struct TracepointTimeMeasurementsParameters
+{
+    QRegularExpression startRegex;
+    QRegularExpression stopRegex;
+    QString name;
+};
 }
 
 Q_DECLARE_METATYPE(Data::Symbol)
@@ -883,3 +893,6 @@ Q_DECLARE_TYPEINFO(Data::TimeRange, Q_MOVABLE_TYPE);
 
 Q_DECLARE_TYPEINFO(Data::FilterAction, Q_MOVABLE_TYPE);
 Q_DECLARE_TYPEINFO(Data::ZoomAction, Q_MOVABLE_TYPE);
+
+Q_DECLARE_METATYPE(Data::TracepointTimeMeasurementsParameters)
+Q_DECLARE_TYPEINFO(Data::TracepointTimeMeasurementsParameters, Q_MOVABLE_TYPE);

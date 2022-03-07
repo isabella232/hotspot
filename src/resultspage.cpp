@@ -103,7 +103,6 @@ ResultsPage::ResultsPage(PerfParser* parser, QWidget* parent)
         dockify(m_resultsDisassemblyPage, QStringLiteral("disassembly"), tr("D&isassembly"), tr("Ctrl+I"));
     m_summaryPageDock->addDockWidgetAsTab(m_disassemblyDock, KDDockWidgets::InitialVisibilityOption::StartHidden);
     m_disassemblyDock->toggleAction()->setEnabled(false);
-    m_summaryPageDock->setAsCurrentTab();
 #if QCustomPlot_FOUND
     m_frequencyDock = dockify(m_frequencyPage, QStringLiteral("frequency"), tr("Fr&equency"), tr("Ctrl+E"));
     m_summaryPageDock->addDockWidgetAsTab(m_frequencyDock);

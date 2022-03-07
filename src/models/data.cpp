@@ -369,3 +369,13 @@ const Data::ThreadEvents* Data::EventResults::findThread(qint32 pid, qint32 tid)
 {
     return const_cast<Data::EventResults*>(this)->findThread(pid, tid);
 }
+
+void BottomUpResults::addTracepointCost(int type, const QVector<qint32>& frames, quint64 cost)
+{
+    auto parent = &root;
+    foreachFrame(frames, [this, type, cost, &parent](const Data::Symbol& symbol, const Data::Location& /*location*/) {
+        parent = parent->entryForSymbol(symbol, &maxBottomUpId);
+        costs.add(type, parent->id, cost);
+        return true;
+    });
+}
