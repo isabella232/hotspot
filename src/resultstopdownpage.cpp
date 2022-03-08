@@ -28,21 +28,26 @@ ResultsTopDownPage::ResultsTopDownPage(FilterAndZoomStack* filterStack, PerfPars
     ResultsUtil::setupContextMenu(ui->topDownTreeView, contextMenu, topDownCostModel, filterStack, this);
 
     connect(parser, &PerfParser::topDownDataAvailable, this,
-            [this, topDownCostModel](const Data::TopDownResults& data) {
+            [this, topDownCostModel, parser](const Data::TopDownResults& data) {
                 topDownCostModel->setData(data);
                 ResultsUtil::hideEmptyColumns(data.inclusiveCosts, ui->topDownTreeView, TopDownModel::NUM_BASE_COLUMNS);
+                ResultsUtil::hideTracepointColumns(data.inclusiveCosts, ui->topDownTreeView,
+                                                   TopDownModel::NUM_BASE_COLUMNS, parser->tracepointCostNames());
+
                 ResultsUtil::hideEmptyColumns(data.selfCosts, ui->topDownTreeView,
                                               TopDownModel::NUM_BASE_COLUMNS + data.inclusiveCosts.numTypes());
+                ResultsUtil::hideTracepointColumns(data.selfCosts, ui->topDownTreeView,
+                                                   TopDownModel::NUM_BASE_COLUMNS + data.inclusiveCosts.numTypes(),
+                                                   parser->tracepointCostNames());
 
-                // hide self cost columns for sched:sched_switch and off-CPU
+                // hide self cost columns for off-CPU
                 // quasi all rows will have a cost of 0%, and only the leaves will show
                 // a non-zero value that is equal to the inclusive cost then
                 const auto costs = data.inclusiveCosts.numTypes();
-                const auto schedSwitchName = QLatin1String("sched:sched_switch");
                 const auto offCpuName = PerfParser::tr("off-CPU Time");
                 for (int i = 0; i < costs; ++i) {
                     const auto typeName = data.inclusiveCosts.typeName(i);
-                    if (typeName == schedSwitchName || typeName == offCpuName) {
+                    if (typeName == offCpuName) {
                         ui->topDownTreeView->hideColumn(topDownCostModel->selfCostColumn(i));
                     }
                 }

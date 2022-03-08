@@ -69,9 +69,11 @@ ResultsBottomUpPage::ResultsBottomUpPage(FilterAndZoomStack* filterStack, PerfPa
 
     connect(
         parser, &PerfParser::bottomUpDataAvailable, this,
-        [this, bottomUpCostModel, exportMenu](const Data::BottomUpResults& data) {
+        [this, bottomUpCostModel, exportMenu, parser](const Data::BottomUpResults& data) {
             bottomUpCostModel->setData(data);
             ResultsUtil::hideEmptyColumns(data.costs, ui->bottomUpTreeView, BottomUpModel::NUM_BASE_COLUMNS);
+            ResultsUtil::hideTracepointColumns(data.costs, ui->bottomUpTreeView, BottomUpModel::NUM_BASE_COLUMNS,
+                                               parser->tracepointCostNames());
 
             {
                 auto stackCollapsed =

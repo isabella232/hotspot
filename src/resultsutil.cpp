@@ -153,6 +153,17 @@ void hideEmptyColumns(const Data::Costs& costs, QTreeView* view, int numBaseColu
     }
 }
 
+void hideTracepointColumns(const Data::Costs& costs, QTreeView* view, int numBaseColumns,
+                           const QSet<QString>& tracepointCostNames)
+{
+    for (int i = 0; i < costs.numTypes(); i++) {
+        const auto costName = costs.typeName(i);
+        if (tracepointCostNames.contains(costName)) {
+            view->hideColumn(numBaseColumns + i);
+        }
+    }
+}
+
 void fillEventSourceComboBox(QComboBox* combo, const Data::Costs& costs, const QString& tooltipTemplate)
 {
     // restore selection if possible
