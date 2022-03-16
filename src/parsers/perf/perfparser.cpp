@@ -810,6 +810,9 @@ public:
     void finalize()
     {
         Data::BottomUp::initializeParents(&bottomUpResult.root);
+        Data::BottomUp::initializeParents(&perThreadBottomUpResult.root);
+        Data::BottomUp::initializeParents(&perProcessBottomUpResult.root);
+        Data::BottomUp::initializeParents(&perCpuBottomUpResult.root);
 
         summaryResult.applicationTime = applicationTime;
         summaryResult.threadCount = uniqueThreads.size();
@@ -819,12 +822,15 @@ public:
         buildPerLibraryResult();
         buildCallerCalleeResult();
 
+        QHash<QString, QString> tidToName;
+
         for (auto& thread : eventResult.threads) {
             thread.time.start = std::max(thread.time.start, applicationTime.start);
             thread.time.end = std::min(thread.time.end, applicationTime.end);
             if (thread.name.isEmpty()) {
                 thread.name = PerfParser::tr("#%1").arg(thread.tid);
             }
+            tidToName[QString::number(thread.tid)] = thread.name;
 
             // we may have been switched out before detaching perf, so increment
             // the off-CPU time in this case
@@ -835,6 +841,20 @@ public:
             if (thread.offCpuTime > 0) {
                 summaryResult.offCpuTime += thread.offCpuTime;
                 summaryResult.onCpuTime += thread.time.delta() - thread.offCpuTime;
+            }
+        }
+
+        for (auto& thread : perThreadBottomUpResult.root.children) {
+            if (tidToName.contains(thread.symbol.symbol)) {
+                thread.symbol.prettySymbol = tidToName[thread.symbol.symbol];
+                thread.symbol.symbol = tidToName[thread.symbol.symbol];
+            }
+        }
+
+        for (auto& process : perProcessBottomUpResult.root.children) {
+            if (tidToName.contains(process.symbol.symbol)) {
+                process.symbol.prettySymbol = tidToName[process.symbol.symbol];
+                process.symbol.symbol = tidToName[process.symbol.symbol];
             }
         }
 
@@ -874,6 +894,9 @@ public:
         summaryResult.costs.push_back({label, 0, 0, unit});
         Q_ASSERT(bottomUpResult.costs.numTypes() == costId);
         bottomUpResult.costs.addType(costId, label, unit);
+        perThreadBottomUpResult.costs.addType(costId, label, unit);
+        perProcessBottomUpResult.costs.addType(costId, label, unit);
+        perCpuBottomUpResult.costs.addType(costId, label, unit);
 
         return costId;
     }
@@ -943,6 +966,9 @@ public:
         bottomUpResult.locations.push_back({location.location.parentLocationId,
                                             {location.location.address, location.location.relAddr, locationString}});
         bottomUpResult.symbols.push_back({});
+        perThreadBottomUpResult.locations = bottomUpResult.locations;
+        perProcessBottomUpResult.locations = bottomUpResult.locations;
+        perCpuBottomUpResult.locations = bottomUpResult.locations;
     }
 
     void addSymbol(const SymbolDefinition& symbol)
@@ -958,6 +984,9 @@ public:
         const auto isKernel = symbol.symbol.isKernel;
         bottomUpResult.symbols[symbol.id] = {symbolString, relAddr,          size,    binaryString,
                                              pathString,   actualPathString, isKernel};
+        perThreadBottomUpResult.symbols = bottomUpResult.symbols;
+        perCpuBottomUpResult.symbols = bottomUpResult.symbols;
+        perProcessBottomUpResult.symbols = bottomUpResult.symbols;
 
         // Count total and missing symbols per module for error report
         auto& numSymbols = numSymbolsByModule[symbol.symbol.binary.id];
@@ -1092,6 +1121,9 @@ public:
         };
 
         bottomUpResult.addEvent(type, sampleCost.cost, sample.frames, frameCallback);
+        perThreadBottomUpResult.addEvent({QString::number(sample.tid)}, type, sampleCost.cost, sample.frames);
+        perProcessBottomUpResult.addEvent({QString::number(sample.pid)}, type, sampleCost.cost, sample.frames);
+        perCpuBottomUpResult.addEvent({QLatin1String("CPU %1").arg(sample.cpu)}, type, sampleCost.cost, sample.frames);
 
         if (perfScriptOutput) {
             *perfScriptOutput << "\n";
@@ -1297,6 +1329,9 @@ public:
     QSet<quint32> uniqueThreads;
     QSet<quint32> uniqueProcess;
     Data::BottomUpResults bottomUpResult;
+    Data::BottomUpResults perThreadBottomUpResult;
+    Data::BottomUpResults perProcessBottomUpResult;
+    Data::BottomUpResults perCpuBottomUpResult;
     Data::TopDownResults topDownResult;
     Data::PerLibraryResults perLibraryResult;
     Data::CallerCalleeResults callerCalleeResult;
@@ -1440,6 +1475,9 @@ void PerfParser::startParseFile(const QString& path, const QString& sysroot, con
         auto finalize = [&d, this]() {
             d.finalize();
             emit bottomUpDataAvailable(d.bottomUpResult);
+            emit bottomUpDataPerThreadAvailable(d.perThreadBottomUpResult);
+            emit bottomUpDataPerProcessAvailable(d.perProcessBottomUpResult);
+            emit bottomUpDataPerCpuAvailable(d.perCpuBottomUpResult);
             emit topDownDataAvailable(d.topDownResult);
             emit perLibraryDataAvailable(d.perLibraryResult);
             emit summaryDataAvailable(d.summaryResult);

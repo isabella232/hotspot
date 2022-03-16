@@ -8,16 +8,14 @@
 
 #pragma once
 
+#include "data.h"
+#include "models/treemodel.h"
 #include <QWidget>
 
 class QMenu;
 
 namespace Ui {
 class ResultsBottomUpPage;
-}
-
-namespace Data {
-struct Symbol;
 }
 
 class QTreeView;
@@ -44,4 +42,9 @@ signals:
 
 private:
     QScopedPointer<Ui::ResultsBottomUpPage> ui;
+    BottomUpModel* bottomUpCostModel;
+    Data::BottomUpResults bottomUpBySymbol;
+    Data::BottomUpResults bottomUpByThread;
+    Data::BottomUpResults bottomUpByProcess;
+    Data::BottomUpResults bottomUpByCpu;
 };

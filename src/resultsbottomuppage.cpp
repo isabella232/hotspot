@@ -59,18 +59,18 @@ ResultsBottomUpPage::ResultsBottomUpPage(FilterAndZoomStack* filterStack, PerfPa
                                          CostContextMenu* contextMenu, QMenu* exportMenu, QWidget* parent)
     : QWidget(parent)
     , ui(new Ui::ResultsBottomUpPage)
+    , bottomUpCostModel(new BottomUpModel(this))
 {
     ui->setupUi(this);
 
-    auto bottomUpCostModel = new BottomUpModel(this);
     ResultsUtil::setupTreeView(ui->bottomUpTreeView, contextMenu, ui->bottomUpSearch, bottomUpCostModel);
     ResultsUtil::setupCostDelegate(bottomUpCostModel, ui->bottomUpTreeView);
     ResultsUtil::setupContextMenu(ui->bottomUpTreeView, contextMenu, bottomUpCostModel, filterStack, this);
 
     connect(
-        parser, &PerfParser::bottomUpDataAvailable, this,
-        [this, bottomUpCostModel, exportMenu](const Data::BottomUpResults& data) {
+        parser, &PerfParser::bottomUpDataAvailable, this, [this, exportMenu](const Data::BottomUpResults& data) {
             bottomUpCostModel->setData(data);
+            bottomUpBySymbol = data;
             ResultsUtil::hideEmptyColumns(data.costs, ui->bottomUpTreeView, BottomUpModel::NUM_BASE_COLUMNS);
 
             {
@@ -79,7 +79,7 @@ ResultsBottomUpPage::ResultsBottomUpPage(FilterAndZoomStack* filterStack, PerfPa
                 stackCollapsed->setToolTip(tr("Export data in textual form compatible with <tt>flamegraph.pl</tt>."));
                 for (int i = 0; i < data.costs.numTypes(); ++i) {
                     const auto costName = data.costs.typeName(i);
-                    stackCollapsed->addAction(costName, [this, i, bottomUpCostModel, costName]() {
+                    stackCollapsed->addAction(costName, [this, i, costName]() {
                         const auto fileName = QFileDialog::getSaveFileName(this, tr("Export %1 Data").arg(costName));
                         if (fileName.isEmpty())
                             return;
@@ -95,6 +95,33 @@ ResultsBottomUpPage::ResultsBottomUpPage(FilterAndZoomStack* filterStack, PerfPa
                 }
             }
         });
+
+    connect(parser, &PerfParser::bottomUpDataPerThreadAvailable, this,
+            [this](const Data::BottomUpResults& data) { bottomUpByThread = data; });
+
+    connect(parser, &PerfParser::bottomUpDataPerProcessAvailable, this,
+            [this](const Data::BottomUpResults& data) { bottomUpByProcess = data; });
+
+    connect(parser, &PerfParser::bottomUpDataPerCpuAvailable, this,
+            [this](const Data::BottomUpResults& data) { bottomUpByCpu = data; });
+
+    for (const auto& aggregationType :
+         {QLatin1String("Symbol"), QLatin1String("Thread"), QLatin1String("Process"), QLatin1String("CPU")}) {
+        ui->costAggregationComboBox->addItem(aggregationType);
+    }
+
+    connect(ui->costAggregationComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this] {
+        const auto currentText = ui->costAggregationComboBox->currentText();
+        if (currentText == QLatin1String("Symbol")) {
+            bottomUpCostModel->setData(bottomUpBySymbol);
+        } else if (currentText == QLatin1String("Thread")) {
+            bottomUpCostModel->setData(bottomUpByThread);
+        } else if (currentText == QLatin1String("Process")) {
+            bottomUpCostModel->setData(bottomUpByProcess);
+        } else if (currentText == QLatin1String("CPU")) {
+            bottomUpCostModel->setData(bottomUpByCpu);
+        }
+    });
 }
 
 ResultsBottomUpPage::~ResultsBottomUpPage() = default;
